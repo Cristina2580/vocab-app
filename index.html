@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2196F3">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%232196F3'/%3E%3Ctext x='96' y='130' font-size='120' font-weight='bold' fill='white' text-anchor='middle' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E">
+<title>背单词</title>
+<style>
+/* ========== Reset & Base ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  color: #212121;
+  background: #f5f5f5;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ========== App Layout ========== */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background: #fafafa;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ========== Header ========== */
+.app-header {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  z-index: 10;
+}
+.app-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.search-box {
+  display: flex;
+  align-items: center;
+  background: #f0f0f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  gap: 8px;
+}
+.search-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  outline: none;
+  color: #212121;
+}
+.search-box input::placeholder { color: #999; }
+.search-box .search-icon { font-size: 16px; color: #999; flex-shrink: 0; }
+.search-clear {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #bbb;
+  color: #fff;
+  border: none;
+  font-size: 14px;
+  line-height: 24px;
+  text-align: center;
+  cursor: pointer;
+  display: none;
+}
+.search-clear.visible { display: block; }
+
+/* ========== Content Area ========== */
+.app-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.page {
+  display: none;
+  height: 100%;
+  overflow: hidden;
+  flex-direction: column;
+}
+.page.active { display: flex; }
+
+/* ========== Virtual Scroll ========== */
+.scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+.scroll-spacer { position: relative; width: 100%; }
+.scroll-window {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  will-change: transform;
+}
+
+/* ========== Word Row ========== */
+.word-row {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 52px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+.word-row:active { background: #f5f5f5; }
+.word-row.marked-green { background: #e8f5e9; }
+.word-row.marked-green:active { background: #c8e6c9; }
+.word-row.marked-red { background: #ffebee; }
+.word-row.marked-red:active { background: #ffcdd2; }
+.word-row.deleted-row { background: #fafafa; color: #999; }
+
+.word-text {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  padding-right: 8px;
+}
+.word-text.has-meaning::after {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #2196F3;
+  margin-left: 6px;
+  vertical-align: middle;
+  position: relative;
+  top: -6px;
+}
+
+.word-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* ========== Action Buttons ========== */
+.btn {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 34px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+.btn:active { transform: scale(0.95); opacity: 0.85; }
+
+.btn-meaning {
+  background: #e3f2fd;
+  color: #1976D2;
+  position: relative;
+}
+.btn-meaning.has-meaning-dot::after {
+  content: '';
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #ff9800;
+}
+
+.btn-green {
+  background: #e8f5e9;
+  color: #388E3C;
+}
+.btn-red {
+  background: #ffebee;
+  color: #D32F2F;
+}
+.btn-delete {
+  background: #f5f5f5;
+  color: #757575;
+}
+.btn-restore {
+  background: #e8f5e9;
+  color: #2E7D32;
+}
+.btn-permadelete {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* ========== Bottom Nav ========== */
+.bottom-nav {
+  flex-shrink: 0;
+  display: flex;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  z-index: 10;
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #999;
+  font-size: 11px;
+  gap: 2px;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+.nav-item .nav-icon { font-size: 22px; line-height: 1; }
+.nav-item .nav-label { font-weight: 500; }
+.nav-item.active { color: #2196F3; }
+.nav-item .nav-badge {
+  position: absolute;
+  top: 2px;
+  right: 50%;
+  transform: translateX(18px);
+  min-width: 18px; height: 18px;
+  border-radius: 9px;
+  background: #f44336;
+  color: #fff;
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+  padding: 0 5px;
+}
+.nav-item { position: relative; }
+
+/* ========== Modal ========== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+  justify-content: center;
+  align-items: flex-end;
+  animation: fadeIn 0.2s;
+}
+.modal-overlay.active { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.modal-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-width: 600px;
+  padding: 20px 16px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  animation: slideUp 0.25s ease-out;
+}
+.modal-sheet h3 {
+  font-size: 17px;
+  margin-bottom: 4px;
+  color: #1a1a1a;
+}
+.modal-word-display {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2196F3;
+  margin-bottom: 16px;
+  word-break: break-all;
+}
+.modal-sheet input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px;
+  outline: none;
+  color: #212121;
+  background: #fafafa;
+  transition: border-color 0.2s;
+}
+.modal-sheet input:focus { border-color: #2196F3; background: #fff; }
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.modal-actions .btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+.btn-save {
+  background: #2196F3;
+  color: #fff;
+  font-weight: 600;
+}
+.btn-cancel {
+  background: #f0f0f0;
+  color: #666;
+}
+
+/* ========== Tabs (Marked page) ========== */
+.tabs {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+.tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 500;
+  color: #999;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+.tab.active { color: #2196F3; border-bottom-color: #2196F3; }
+.tab-green.active { color: #388E3C; border-bottom-color: #4CAF50; }
+.tab-red.active { color: #D32F2F; border-bottom-color: #F44336; }
+.tab .tab-count {
+  font-size: 12px;
+  background: #e0e0e0;
+  color: #666;
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 4px;
+}
+.tab.active .tab-count { background: #e3f2fd; color: #1976D2; }
+.tab-green.active .tab-count { background: #e8f5e9; color: #388E3C; }
+.tab-red.active .tab-count { background: #ffebee; color: #D32F2F; }
+
+/* ========== Import Page ========== */
+.import-page-content {
+  padding: 16px;
+  overflow-y: auto;
+}
+.import-page-content label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 8px;
+}
+.import-page-content textarea {
+  width: 100%;
+  height: 160px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  color: #212121;
+  background: #fafafa;
+  transition: border-color 0.2s;
+  line-height: 1.6;
+}
+.import-page-content textarea:focus { border-color: #2196F3; background: #fff; }
+.import-hint {
+  font-size: 13px;
+  color: #999;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.import-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.import-actions .btn { flex: 1; padding: 12px; font-size: 15px; border-radius: 10px; }
+.btn-import {
+  background: #2196F3;
+  color: #fff;
+  font-weight: 600;
+}
+.btn-clear-textarea {
+  background: #f0f0f0;
+  color: #666;
+}
+.import-result {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  display: none;
+}
+.import-result.show { display: block; }
+.import-result.success { background: #e8f5e9; color: #2E7D32; }
+.import-result.warning { background: #fff3e0; color: #e65100; }
+.import-result .dup-list {
+  font-size: 12px;
+  margin-top: 4px;
+  color: #888;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+/* ========== Toast ========== */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* ========== Empty State ========== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #bbb;
+  text-align: center;
+  padding: 40px;
+}
+.empty-state .empty-icon { font-size: 64px; margin-bottom: 16px; }
+.empty-state .empty-text { font-size: 16px; line-height: 1.5; }
+
+/* ========== Scrollbar Hide ========== */
+.scroll-container::-webkit-scrollbar { display: none; }
+.scroll-container { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ========== Confirm Dialog ========== */
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 150;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.2s;
+}
+.confirm-overlay.active { display: flex; }
+.confirm-dialog {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px 20px 16px;
+  width: 280px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+.confirm-dialog p { font-size: 15px; margin-bottom: 20px; color: #333; line-height: 1.5; }
+.confirm-dialog .btn-group { display: flex; gap: 10px; }
+.confirm-dialog .btn-group .btn { flex: 1; padding: 10px; font-size: 15px; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Header -->
+  <div class="app-header" id="appHeader">
+    <h1 id="headerTitle">📚 背单词</h1>
+    <div class="search-box" id="searchBox">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="搜索单词..." autocomplete="off">
+      <button class="search-clear" id="searchClear">✕</button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="app-content" id="appContent">
+
+    <!-- 首页 -->
+    <div class="page active" id="page-home">
+      <div class="scroll-container" id="homeScroll">
+        <div class="scroll-spacer" id="homeSpacer">
+          <div class="scroll-window" id="homeWindow"></div>
+        </div>
+      </div>
+      <div class="empty-state" id="homeEmpty" style="display:none">
+        <div class="empty-icon">📝</div>
+        <div class="empty-text">还没有单词<br>去「导入」页面添加吧</div>
+      </div>
+    </div>
+
+    <!-- 标记页 -->
+    <div class="page" id="page-marked">
+      <div class="tabs">
+        <button class="tab tab-green active" data-tab="green">🟢 标绿 <span class="tab-count" id="greenCount">0</span></button>
+        <button class="tab tab-red" data-tab="red">🔴 标红 <span class="tab-count" id="redCount">0</span></button>
+      </div>
+      <div class="scroll-container" id="markedScroll">
+        <div class="scroll-spacer" id="markedSpacer">
+          <div class="scroll-window" id="markedWindow"></div>
+        </div>
+      </div>
+      <div class="empty-state" id="markedEmpty" style="display:none">
+        <div class="empty-icon">🏷️</div>
+        <div class="empty-text">没有标记的单词</div>
+      </div>
+    </div>
+
+    <!-- 删除页 -->
+    <div class="page" id="page-deleted">
+      <div class="scroll-container" id="deletedScroll">
+        <div class="scroll-spacer" id="deletedSpacer">
+          <div class="scroll-window" id="deletedWindow"></div>
+        </div>
+      </div>
+      <div class="empty-state" id="deletedEmpty" style="display:none">
+        <div class="empty-icon">🗑️</div>
+        <div class="empty-text">没有删除的单词</div>
+      </div>
+    </div>
+
+    <!-- 导入页 -->
+    <div class="page" id="page-import">
+      <div class="import-page-content">
+        <label for="importTextarea">输入单词（用英文逗号 , 隔开）：</label>
+        <textarea id="importTextarea" placeholder="例如：abandon, apple, banana, cherry"></textarea>
+        <p class="import-hint">💡 支持英文逗号分隔，重复单词会自动跳过并提示</p>
+        <div class="import-actions">
+          <button class="btn btn-import" id="btnImport">📥 导入单词</button>
+          <button class="btn btn-clear-textarea" id="btnClearImport">清空</button>
+        </div>
+        <div class="import-result" id="importResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">首页</span>
+      <span class="nav-badge" id="homeBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" data-page="marked">
+      <span class="nav-icon">🏷️</span>
+      <span class="nav-label">标记</span>
+      <span class="nav-badge" id="markedBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" data-page="deleted">
+      <span class="nav-icon">🗑️</span>
+      <span class="nav-label">删除</span>
+      <span class="nav-badge" id="deletedBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" data-page="import">
+      <span class="nav-icon">📥</span>
+      <span class="nav-label">导入</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Meaning Modal -->
+<div class="modal-overlay" id="meaningModal">
+  <div class="modal-sheet">
+    <h3>输入中文释义</h3>
+    <div class="modal-word-display" id="modalWordDisplay"></div>
+    <input type="text" id="modalMeaningInput" placeholder="输入中文意思..." autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="modalCancel">取消</button>
+      <button class="btn btn-save" id="modalSave">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-dialog">
+    <p id="confirmText"></p>
+    <div class="btn-group">
+      <button class="btn btn-cancel" id="confirmCancel">取消</button>
+      <button class="btn btn-save" id="confirmOk">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+// ==================== CONSTANTS ====================
+const ROW_HEIGHT = 52;
+const BUFFER = 8;
+const STORAGE_KEY = 'vocab_app_words_v2';
+
+// ==================== DEFAULT WORDS ====================
+const DEFAULT_WORDS = [
+    "resemble","recognize","adjust","approach","fundamental","rely on","domestic","measure","trait","coin","artificial","prompt","exchange","underlie","ignore","fertiliser","that","and","rather than","neither... nor...","either…or…","feasible","flexible","constrain","deficiency","supplement","distinguish","analyze","paralyse","emphasize","enormous","imitate","impair","hinder","legitimate","limitation","convention","demanding","determine","accelerate","ancient","beneficial","chronic","conscious","minimize","immunity","imperative","secrete","exaggerate","transmit","extinct","exclusive","guarantee","inherit","witness","magnetic","loss","option","prefer to","priority","primary","principle","potential","quantity","settle","sophisticate","specific","survive","swift","unexpectedly","surrounding","attempt","expertise","faculty","donate","denote","dynamics","incentive","mortality","peripheral","vicinity","threaten","practice","bacteria","be subject to","be liable to","innate","pattern","therapy","original","confidential","cognitive","comply with","consult","superior","co-operation","co-ordinate","differ","cue","signal","abandon","halt","fragile","delicate","retain","vanish","delivery","erode","induce","stable","integrate","interpret","equal","grant","accumulate","addictive","adversity","diversity","various","aggression","agreeable","aid","allergic","altitude","attitude","application","approve","prove","array","assign","association","authority","be consistent with","in accordance with","bear","blight","boundary","bungle","burden","calamity","capacity","catastrophic","cater","certify","civic","comment","commitment","communal","commute","compare","conceal","concentrate","concur","conquer","confer","conflict","confuse","conservative","considerable","contingent","controversial","correlation","courtship","crash","credibility","criminal","crisis","criticism","curb","damp","dazzle","deadline","delay","democratic","demographic","dental","depression","designate","detain","devastate","disclose","exposure","disparate","distinct","desperate","discrete","display","disrupt","distract","distribute","contribute","attribute","documentation","domain","dominant","dramatic","drought","durable","eco-friendly","elaborate","elderly","eliminate","elusive","encyclopaedia","entrepreneur","equator","erratically","established","estate","ethical","eventually","evidence","evolve","exceptional","exhausted","experiment","explicit","exploit","extend","extract","famine","finite","final","initiate","fitness","foe","enemy","format","fragment","freeze","fulfill","gene","gifted","graphic","habitat","harbour","hardship","harsh","hypothesis","impact","impressive","depressive","inaccurate","inactive","inappropriate","indulge","infest","installment","intelligence","intense","interaction","interference","interior","interrupt","introverted","involve","keen","label","lack","landscape","likelihood","limb","linguistic","log","look-in","lopsided","mainly","malfunction","breakdown","mammal","manage to do","manifest","manufacture","marine","maritime","mate","mechanism","mental","mercury","meteorological","migrate","moisture","monitor","motif","mould","native","nocturnal","norm","notoriety","objective","obligation","obscure","obtain","odd","odour","offensive","defensive","official","optimum","ordinary","organ","out of the question","overcome","overtake","undertake","parameter","paramount","participate","patient","peak","permit","persuade","pessimistic","phase","physical","plagiarise","paralysis","analysis","plenty of","plot","pose","portable","poverty","praise","predict","pressing","private","prohibit","prolong","promote","prosper","proper","purify","qualify","radical","range","rare","rate","react","recreation","reduction","refer to","rehearsal","reject","relevant","religious","reluctant","reproduce","responsible","revision","revive","ruin","scenic","shade","skepticism","soar","solely","solicitor","steer","stimulate","simulate","stride","succumb","subdivide","subtle","substance","sufficiency","supersede","suppress","supremacy","suspicious","sustainable","symptom","tension","term","throughout","tool","trace","transcend","transparent","transit","tremendous","trigger","tropical","unbiased","uniform","valuable","versatile","view","violent","violate","isolate","visible","visual","well-being"
+];
+
+// ==================== DOM REFS ====================
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+const appHeader = $('#appHeader');
+const headerTitle = $('#headerTitle');
+const searchBox = $('#searchBox');
+const searchInput = $('#searchInput');
+const searchClear = $('#searchClear');
+
+const pages = {
+  home: $('#page-home'),
+  marked: $('#page-marked'),
+  deleted: $('#page-deleted'),
+  import: $('#page-import'),
+};
+
+const scrollContainers = {
+  home: $('#homeScroll'),
+  marked: $('#markedScroll'),
+  deleted: $('#deletedScroll'),
+};
+const spacers = {
+  home: $('#homeSpacer'),
+  marked: $('#markedSpacer'),
+  deleted: $('#deletedSpacer'),
+};
+const windows = {
+  home: $('#homeWindow'),
+  marked: $('#markedWindow'),
+  deleted: $('#deletedWindow'),
+};
+const emptyStates = {
+  home: $('#homeEmpty'),
+  marked: $('#markedEmpty'),
+  deleted: $('#deletedEmpty'),
+};
+
+const meaningModal = $('#meaningModal');
+const modalWordDisplay = $('#modalWordDisplay');
+const modalMeaningInput = $('#modalMeaningInput');
+const confirmOverlay = $('#confirmOverlay');
+const confirmText = $('#confirmText');
+const toast = $('#toast');
+
+const importTextarea = $('#importTextarea');
+const importResult = $('#importResult');
+
+// ==================== STATE ====================
+let words = [];
+let currentPage = 'home';
+let markedTab = 'green';
+let currentModalWordId = null;
+let confirmCallback = null;
+
+// ==================== PERSISTENCE ====================
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      words = JSON.parse(raw);
+      // Data migration: ensure all words have required fields
+      words.forEach(w => {
+        if (!w.color) w.color = null;
+        if (w.meaning === undefined) w.meaning = '';
+        if (w.deleted === undefined) w.deleted = false;
+        if (!w.id) w.id = generateId();
+        if (!w.createdAt) w.createdAt = Date.now();
+      });
+    } else {
+      // First time: load default words
+      words = DEFAULT_WORDS.map(w => ({
+        id: generateId(),
+        word: w,
+        meaning: '',
+        color: null,
+        deleted: false,
+        deletedAt: null,
+        createdAt: Date.now(),
+      }));
+      saveData();
+    }
+  } catch (e) {
+    words = [];
+  }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+  } catch (e) {
+    showToast('⚠️ 存储空间不足，请清理一些数据');
+  }
+}
+
+function generateId() {
+  return 'w_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+}
+
+// ==================== HELPERS ====================
+function getHomeWords() {
+  const q = searchInput.value.trim().toLowerCase();
+  let result = words.filter(w => !w.deleted);
+  if (q) {
+    result = result.filter(w => w.word.toLowerCase().includes(q));
+  }
+  return result;
+}
+
+function getMarkedWords(color) {
+  return words.filter(w => !w.deleted && w.color === color);
+}
+
+function getDeletedWords() {
+  return words.filter(w => w.deleted);
+}
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+function showConfirm(msg, cb) {
+  confirmText.textContent = msg;
+  confirmCallback = cb;
+  confirmOverlay.classList.add('active');
+}
+
+// ==================== VIRTUAL SCROLL ====================
+function renderVirtualList(containerId, items, renderRow) {
+  const container = scrollContainers[containerId];
+  const spacer = spacers[containerId];
+  const windowEl = windows[containerId];
+  const emptyEl = emptyStates[containerId];
+
+  if (!container || !spacer || !windowEl) return;
+
+  // Handle empty state
+  if (items.length === 0) {
+    container.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'flex';
+    return;
+  }
+  container.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const totalHeight = items.length * ROW_HEIGHT;
+  spacer.style.height = totalHeight + 'px';
+
+  const scrollTop = container.scrollTop;
+  const containerHeight = container.clientHeight;
+
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
+  const endIndex = Math.min(items.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + BUFFER);
+
+  windowEl.style.top = (startIndex * ROW_HEIGHT) + 'px';
+
+  let html = '';
+  for (let i = startIndex; i < endIndex; i++) {
+    html += renderRow(items[i], i);
+  }
+  windowEl.innerHTML = html;
+}
+
+// ==================== ROW RENDERERS ====================
+function renderHomeRow(w) {
+  const cls = [];
+  if (w.color === 'green') cls.push('marked-green');
+  if (w.color === 'red') cls.push('marked-red');
+  const wordCls = w.meaning ? 'word-text has-meaning' : 'word-text';
+  const meaningCls = w.meaning ? 'btn btn-meaning has-meaning-dot' : 'btn btn-meaning';
+
+  return `
+    <div class="word-row ${cls.join(' ')}" data-id="${w.id}">
+      <span class="${wordCls}">${escHtml(w.word)}</span>
+      <div class="word-actions">
+        <button class="${meaningCls}" data-action="meaning" data-id="${w.id}">释义</button>
+        <button class="btn btn-green" data-action="mark-green" data-id="${w.id}">标绿</button>
+        <button class="btn btn-red" data-action="mark-red" data-id="${w.id}">标红</button>
+        <button class="btn btn-delete" data-action="soft-delete" data-id="${w.id}">删除</button>
+      </div>
+    </div>`;
+}
+
+function renderMarkedRow(w) {
+  const cls = w.color === 'green' ? 'marked-green' : 'marked-red';
+  const wordCls = w.meaning ? 'word-text has-meaning' : 'word-text';
+  const meaningCls = w.meaning ? 'btn btn-meaning has-meaning-dot' : 'btn btn-meaning';
+
+  return `
+    <div class="word-row ${cls}" data-id="${w.id}">
+      <span class="${wordCls}">${escHtml(w.word)}</span>
+      <div class="word-actions">
+        <button class="${meaningCls}" data-action="meaning" data-id="${w.id}">释义</button>
+        <button class="btn btn-delete" data-action="unmark" data-id="${w.id}">取消标记</button>
+        <button class="btn btn-delete" data-action="soft-delete" data-id="${w.id}">删除</button>
+      </div>
+    </div>`;
+}
+
+function renderDeletedRow(w) {
+  return `
+    <div class="word-row deleted-row" data-id="${w.id}">
+      <span class="word-text">${escHtml(w.word)}</span>
+      <div class="word-actions">
+        <button class="btn btn-restore" data-action="restore" data-id="${w.id}">恢复</button>
+        <button class="btn btn-permadelete" data-action="perma-delete" data-id="${w.id}">彻底删除</button>
+      </div>
+    </div>`;
+}
+
+function escHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// ==================== RENDER PAGES ====================
+function renderHome() {
+  const items = getHomeWords();
+  renderVirtualList('home', items, renderHomeRow);
+  updateBadge('home', words.filter(w => !w.deleted).length);
+}
+
+function renderMarked() {
+  const items = getMarkedWords(markedTab);
+  renderVirtualList('marked', items, renderMarkedRow);
+  updateBadge('greenCount', getMarkedWords('green').length);
+  updateBadge('redCount', getMarkedWords('red').length);
+  updateBadge('marked', getMarkedWords('green').length + getMarkedWords('red').length);
+}
+
+function renderDeleted() {
+  const items = getDeletedWords();
+  renderVirtualList('deleted', items, renderDeletedRow);
+  updateBadge('deleted', items.length);
+}
+
+function updateBadge(id, count) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (count > 0) {
+    el.textContent = count > 99 ? '99+' : count;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function renderCurrentPage() {
+  switch (currentPage) {
+    case 'home': renderHome(); break;
+    case 'marked': renderMarked(); break;
+    case 'deleted': renderDeleted(); break;
+  }
+}
+
+function renderAll() {
+  renderHome();
+  renderMarked();
+  renderDeleted();
+}
+
+// ==================== PAGE SWITCHING ====================
+function switchPage(page) {
+  currentPage = page;
+
+  // Update pages
+  Object.keys(pages).forEach(k => pages[k].classList.remove('active'));
+  pages[page].classList.add('active');
+
+  // Update nav
+  $$('.nav-item').forEach(el => el.classList.remove('active'));
+  const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (navItem) navItem.classList.add('active');
+
+  // Update header
+  if (page === 'home') {
+    headerTitle.textContent = '📚 背单词';
+    searchBox.style.display = 'flex';
+  } else if (page === 'marked') {
+    headerTitle.textContent = '🏷️ 标记';
+    searchBox.style.display = 'none';
+  } else if (page === 'deleted') {
+    headerTitle.textContent = '🗑️ 删除';
+    searchBox.style.display = 'none';
+  } else if (page === 'import') {
+    headerTitle.textContent = '📥 导入';
+    searchBox.style.display = 'none';
+  }
+
+  renderCurrentPage();
+}
+
+// ==================== ACTIONS ====================
+function getWordById(id) {
+  return words.find(w => w.id === id);
+}
+
+function handleAction(action, wordId) {
+  const w = getWordById(wordId);
+  if (!w) return;
+
+  switch (action) {
+    case 'meaning':
+      openMeaningModal(w);
+      break;
+    case 'mark-green':
+      w.color = w.color === 'green' ? null : 'green';
+      saveData();
+      renderAll();
+      break;
+    case 'mark-red':
+      w.color = w.color === 'red' ? null : 'red';
+      saveData();
+      renderAll();
+      break;
+    case 'soft-delete':
+      w.deleted = true;
+      w.deletedAt = Date.now();
+      saveData();
+      renderAll();
+      showToast(`已删除: ${w.word}`);
+      break;
+    case 'unmark':
+      w.color = null;
+      saveData();
+      renderAll();
+      showToast(`已取消标记: ${w.word}`);
+      break;
+    case 'restore':
+      w.deleted = false;
+      w.deletedAt = null;
+      saveData();
+      renderAll();
+      showToast(`已恢复: ${w.word}`);
+      break;
+    case 'perma-delete':
+      showConfirm(`确定要彻底删除「${w.word}」吗？此操作不可恢复。`, () => {
+        words = words.filter(x => x.id !== wordId);
+        saveData();
+        renderAll();
+        showToast(`已彻底删除: ${w.word}`);
+      });
+      break;
+  }
+}
+
+// ==================== MEANING MODAL ====================
+function openMeaningModal(w) {
+  currentModalWordId = w.id;
+  modalWordDisplay.textContent = w.word;
+  modalMeaningInput.value = w.meaning || '';
+  meaningModal.classList.add('active');
+  setTimeout(() => modalMeaningInput.focus(), 300);
+}
+
+function closeMeaningModal() {
+  meaningModal.classList.remove('active');
+  currentModalWordId = null;
+  modalMeaningInput.value = '';
+}
+
+function saveMeaning() {
+  if (!currentModalWordId) return;
+  const w = getWordById(currentModalWordId);
+  if (!w) return;
+  w.meaning = modalMeaningInput.value.trim();
+  saveData();
+  renderAll();
+  closeMeaningModal();
+  if (w.meaning) {
+    showToast('释义已保存 ✓');
+  } else {
+    showToast('释义已清空');
+  }
+}
+
+// ==================== IMPORT ====================
+function doImport() {
+  const raw = importTextarea.value.trim();
+  if (!raw) {
+    showToast('请先输入单词');
+    return;
+  }
+
+  // Split by comma, clean up
+  const parts = raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+  if (parts.length === 0) {
+    showToast('没有检测到有效单词');
+    return;
+  }
+
+  let added = 0;
+  const duplicates = [];
+  const existingWords = new Set(words.map(w => w.word.toLowerCase()));
+
+  parts.forEach(part => {
+    if (existingWords.has(part.toLowerCase())) {
+      duplicates.push(part);
+    } else {
+      words.push({
+        id: generateId(),
+        word: part,
+        meaning: '',
+        color: null,
+        deleted: false,
+        deletedAt: null,
+        createdAt: Date.now(),
+      });
+      existingWords.add(part.toLowerCase());
+      added++;
+    }
+  });
+
+  saveData();
+  renderAll();
+
+  // Show result
+  importResult.className = 'import-result show';
+  let msg = '';
+  if (added > 0) {
+    importResult.classList.add('success');
+    msg += `✅ 成功导入 ${added} 个单词`;
+  }
+  if (duplicates.length > 0) {
+    importResult.classList.add(added === 0 ? 'warning' : 'success');
+    msg += (msg ? '<br>' : '') + `⚠️ ${duplicates.length} 个重复已跳过`;
+    if (duplicates.length <= 20) {
+      msg += `<div class="dup-list">${duplicates.map(escHtml).join(', ')}</div>`;
+    } else {
+      msg += `<div class="dup-list">${duplicates.slice(0, 20).map(escHtml).join(', ')}... 等</div>`;
+    }
+  }
+  if (added === 0 && duplicates.length === 0) {
+    importResult.classList.add('warning');
+    msg = '未识别到单词，请检查格式';
+  }
+
+  importResult.innerHTML = msg;
+
+  if (added > 0) {
+    importTextarea.value = '';
+  }
+}
+
+// ==================== EVENT DELEGATION ====================
+// Click delegation for word actions in virtual scroll windows
+Object.values(windows).forEach(win => {
+  win.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const action = btn.dataset.action;
+    const wordId = btn.dataset.id;
+    handleAction(action, wordId);
+  });
+});
+
+// Bottom nav
+$$('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const page = item.dataset.page;
+    if (page) switchPage(page);
+  });
+});
+
+// Scroll events for virtual scrolling
+Object.entries(scrollContainers).forEach(([key, container]) => {
+  if (!container) return;
+  let ticking = false;
+  container.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        if (key === 'home') renderHome();
+        else if (key === 'marked') renderMarked();
+        else if (key === 'deleted') renderDeleted();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  });
+});
+
+// Search
+let searchTimeout;
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    if (searchInput.value.trim()) {
+      searchClear.classList.add('visible');
+    } else {
+      searchClear.classList.remove('visible');
+    }
+    renderHome();
+  }, 150);
+});
+
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClear.classList.remove('visible');
+  renderHome();
+  searchInput.focus();
+});
+
+// Meaning modal
+$('#modalCancel').addEventListener('click', closeMeaningModal);
+$('#modalSave').addEventListener('click', saveMeaning);
+meaningModal.addEventListener('click', (e) => {
+  if (e.target === meaningModal) closeMeaningModal();
+});
+modalMeaningInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') saveMeaning();
+});
+
+// Confirm dialog
+$('#confirmCancel').addEventListener('click', () => {
+  confirmOverlay.classList.remove('active');
+  confirmCallback = null;
+});
+$('#confirmOk').addEventListener('click', () => {
+  confirmOverlay.classList.remove('active');
+  if (confirmCallback) {
+    const cb = confirmCallback;
+    confirmCallback = null;
+    cb();
+  }
+});
+
+// Import
+$('#btnImport').addEventListener('click', doImport);
+$('#btnClearImport').addEventListener('click', () => {
+  importTextarea.value = '';
+  importResult.className = 'import-result';
+  importResult.innerHTML = '';
+});
+
+// Tab switching
+document.querySelector('.tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  markedTab = tab.dataset.tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  renderMarked();
+});
+
+// Resize handler - re-render on resize (keyboard open/close, orientation change)
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(renderCurrentPage, 200);
+});
+
+// Keyboard escape to close modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (meaningModal.classList.contains('active')) closeMeaningModal();
+    if (confirmOverlay.classList.contains('active')) {
+      confirmOverlay.classList.remove('active');
+      confirmCallback = null;
+    }
+  }
+});
+
+// ==================== INIT ====================
+function init() {
+  loadData();
+  switchPage('home');
+
+  // Register service worker for PWA
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+  updateBadge('home', words.filter(w => !w.deleted).length);
+  updateBadge('greenCount', getMarkedWords('green').length);
+  updateBadge('redCount', getMarkedWords('red').length);
+  updateBadge('marked', getMarkedWords('green').length + getMarkedWords('red').length);
+  updateBadge('deleted', getDeletedWords().length);
+}
+
+init();
+
+console.log('📚 背单词 App 已就绪');
+console.log('   单词总数:', words.length);
+console.log('   首页单词:', words.filter(w => !w.deleted).length);
+console.log('   标记单词:', words.filter(w => !w.deleted && w.color).length);
+console.log('   已删除:', words.filter(w => w.deleted).length);
+console.log('   数据存储在浏览器 localStorage，不会丢失');
+})();
+</script>
+
+</body>
+</html>
