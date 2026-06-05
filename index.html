@@ -736,6 +736,8 @@ function generateId() {
 function getHomeWords() {
   const q = searchInput.value.trim().toLowerCase();
   let result = words.filter(w => !w.deleted);
+  // Sort: newest first (newly imported words appear at the top)
+  result.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (q) {
     result = result.filter(w => w.word.toLowerCase().includes(q));
   }
@@ -1207,9 +1209,11 @@ function init() {
   loadData();
   switchPage('home');
 
-  // Register service worker for PWA
+  // Unregister old service worker (not needed - data is in localStorage)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/vocab-app/sw.js').catch(() => {});
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(r => r.unregister());
+    });
   }
   updateBadge('home', words.filter(w => !w.deleted).length);
   updateBadge('greenCount', getMarkedWords('green').length);
